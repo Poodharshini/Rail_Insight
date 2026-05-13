@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Rail Action Tracker - View</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Segoe+UI:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --app-bg: #F3F2F7; --sheet-bg: #FFFFFF; --primary: #673AB7; --primary-light: #EDE7F6;
+            --grid-line: #D1D5DB; --header-bg: #F8F9FA; --header-hover: #E9ECEF; --text-main: #1F2937;
+            --text-muted: #6B7280; --active-cell: #673AB7; --danger: #EF4444; --warning-bg: #FFF9C4;
+
+            --c-not-started: #F3F4F6; --t-not-started: #4B5563;
+            --c-progress: #FEF3C7;    --t-progress: #92400E;
+            --c-complete: #D1FAE5;    --t-complete: #065F46;
+            --c-hold: #E0E7FF;        --t-hold: #3730A3;
+            --c-overdue: #FEE2E2;     --t-overdue: #991B1B;
+
+            --p-high-bg: #FEE2E2;     --p-high-text: #991B1B;
+            --p-med-bg: #FEF3C7;      --p-med-text: #92400E;
+            --p-low-bg: #D1FAE5;      --p-low-text: #065F46;
+        }
+
+        body, html { margin: 0; padding: 0; height: 100vh; font-family: 'Segoe UI', 'Inter', sans-serif; background-color: var(--app-bg); display: flex; flex-direction: column; overflow: hidden; }
+        .ribbon { background-color: var(--sheet-bg); border-bottom: 1px solid var(--grid-line); padding: 10px 20px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.02); z-index: 100; }
+        .ribbon-brand { display: flex; align-items: center; gap: 12px; font-size: 1.15rem; font-weight: 600; color: var(--primary); }
+        .ribbon-brand svg { width: 24px; height: 24px; fill: var(--primary); }
+        .tab-group { display: flex; gap: 4px; margin-left: 20px; border-left: 2px solid var(--grid-line); padding-left: 20px; }
+        .tab-btn { background: transparent; border: none; color: var(--text-muted); font-weight: 600; padding: 6px 14px; cursor: pointer; border-radius: 4px; transition: all 0.2s; font-size: 0.9rem; }
+        .tab-btn:hover { background: var(--header-hover); }
+        .tab-btn.active { background: var(--primary-light); color: var(--primary); }
+        .tab-btn.tab-success:hover { background: #D1FAE5; color: #065F46; }
+        .tab-btn.tab-success.active { background: #D1FAE5; color: #065F46; }
+        .tab-btn.tab-danger.active { background: #FEE2E2; color: var(--danger); } 
+        .ribbon-tools { display: flex; gap: 12px; }
+        .btn { background-color: var(--primary-light); color: var(--primary); border: 1px solid transparent; padding: 6px 16px; border-radius: 4px; font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 6px; }
+        .btn:hover { background-color: var(--primary); color: white; }
+        .formula-bar { background-color: var(--sheet-bg); border-bottom: 1px solid var(--grid-line); padding: 6px 12px; display: flex; align-items: center; gap: 15px; font-size: 0.85rem; }
+        .formula-box { display: flex; align-items: center; background: #F8F9FA; border: 1px solid var(--grid-line); border-radius: 2px; padding: 2px 8px; flex: 1; }
+        .formula-box label { font-weight: 600; color: var(--text-muted); margin-right: 10px; white-space: nowrap; }
+        .formula-box input { border: none; background: transparent; width: 100%; outline: none; font-family: inherit; font-size: 0.9rem; color: var(--text-main); }
+        .date-box { flex: 0 0 200px; }
+        .sheet-wrapper { flex: 1; overflow: auto; background-color: var(--header-bg); position: relative; }
+        table { border-collapse: collapse; table-layout: fixed; width: max-content; min-width: 100%; background-color: var(--sheet-bg); }
+        
+        /* Adjusted columns since Revised is gone */
+        col.c-row-num { width: 45px; } col.c-category { width: 150px; } col.c-points { width: 280px; } 
+        col.c-plan { width: 280px; } col.c-resp { width: 140px; } col.c-support { width: 160px; } 
+        col.c-assigned { width: 150px; } col.c-due-history { width: 150px; } col.c-ageing { width: 200px; } 
+        col.c-prio { width: 110px; } col.c-stat { width: 130px; } col.c-comp { width: 80px; } 
+        col.c-notes { width: 200px; } col.c-del { width: 50px; }
+        
+        th, td { border: 1px solid var(--grid-line); padding: 0; margin: 0; box-sizing: border-box; vertical-align: top; }
+        td.cell-center { vertical-align: middle; }
+        td.cell-center input, td.cell-center select { text-align: center; text-align-last: center; }
+        .date-save-wrapper { display: flex; align-items: center; width: 100%; height: 100%; background: transparent; }
+        .date-save-wrapper input { flex: 1; min-width: 0; }
+        .save-date-btn { background: var(--primary-light); color: var(--primary); border: none; font-weight: bold; cursor: pointer; padding: 0 8px; font-size: 0.9rem; height: 100%; border-left: 1px solid var(--grid-line); transition: all 0.2s; }
+        .save-date-btn:hover { background: var(--primary); color: white; }
+        th { background-color: var(--primary); color: #FFFFFF; font-weight: 600; font-size: 0.8rem; padding: 10px 4px; text-align: center; position: sticky; top: 0; z-index: 10; user-select: none; border: 1px solid #5e35b1; }
+        td.row-num { background-color: var(--header-bg); color: var(--text-muted); font-weight: 600; font-size: 0.75rem; text-align: center; position: sticky; left: 0; z-index: 5; user-select: none; box-shadow: 1px 0 0 var(--grid-line); padding-top: 8px; }
+        td.row-num:hover { background-color: var(--header-hover); }
+        td input, td select, td textarea { width: 100%; height: 100%; min-height: 32px; border: 2px solid transparent; outline: none; background: transparent; font-family: inherit; font-size: 0.85rem; color: var(--text-main); padding: 6px 8px; margin: 0; box-sizing: border-box; display: block; border-radius: 0; }
+        td textarea { resize: none; white-space: pre-wrap; overflow: hidden; line-height: 1.4; }
+        td input:focus, td select:focus, td textarea:focus { border-color: var(--active-cell); background-color: #FFFFFF; z-index: 2; position: relative; box-shadow: 0 0 5px rgba(103, 58, 183, 0.2); }
+        td input:hover:not(:focus):not([readonly]):not(:disabled), td select:hover:not(:focus), td textarea:hover:not(:focus) { background-color: #F6F4F9; }
+        input.locked { background-color: #F8F9FA; color: var(--text-muted); text-align: center; cursor: default;}
+        input.locked.highlight { font-weight: 600; color: var(--active-cell); }
+        input.locked.danger { font-weight: 600; color: var(--danger); }
+        input.locked.warning { font-weight: 600; color: #D97706; }
+        input:disabled { background-color: #F8F9FA; color: #9CA3AF; cursor: not-allowed; }
+        select { appearance: none; background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236B7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e"); background-repeat: no-repeat; background-position: right 6px center; background-size: 12px; cursor: pointer; }
+        
+        td.c-not-started { background-color: var(--c-not-started); } td.c-not-started select { color: var(--t-not-started); font-weight: 600; background: transparent; }
+        td.c-progress { background-color: var(--c-progress); } td.c-progress select { color: var(--t-progress); font-weight: 600; background: transparent; }
+        td.c-complete { background-color: var(--c-complete); } td.c-complete select { color: var(--t-complete); font-weight: 600; background: transparent; }
+        td.c-hold { background-color: var(--c-hold); } td.c-hold select { color: var(--t-hold); font-weight: 600; background: transparent; }
+        td.c-overdue { background-color: var(--c-overdue); } td.c-overdue select { color: var(--t-overdue); font-weight: 600; background: transparent; }
+        td.p-high { background-color: var(--p-high-bg); } td.p-high select { color: var(--p-high-text); font-weight: 600; background: transparent; }
+        td.p-medium { background-color: var(--p-med-bg); } td.p-medium select { color: var(--p-med-text); font-weight: 600; background: transparent; }
+        td.p-low { background-color: var(--p-low-bg); } td.p-low select { color: var(--p-low-text); font-weight: 600; background: transparent; }
+        td.p-high select:hover:not(:focus), td.p-medium select:hover:not(:focus), td.p-low select:hover:not(:focus), td.c-not-started select:hover:not(:focus), td.c-progress select:hover:not(:focus), td.c-complete select:hover:not(:focus), td.c-hold select:hover:not(:focus), td.c-overdue select:hover:not(:focus) { background-color: transparent; }
+        
+        .del-btn { background: none; border: none; color: #D1D5DB; font-size: 1.1rem; width: 100%; height: 100%; cursor: pointer; display: flex; align-items: center; justify-content: center; padding-top: 8px; }
+        .del-btn:hover { color: var(--danger); background-color: #FEE2E2; }
+        ::-webkit-scrollbar { width: 14px; height: 14px; }
+        ::-webkit-scrollbar-track { background: #F8F9FA; border: 1px solid var(--grid-line); }
+        ::-webkit-scrollbar-thumb { background: #CBD5E1; border: 3px solid #F8F9FA; border-radius: 8px; }
+        ::-webkit-scrollbar-thumb:hover { background: #9CA3AF; }
+        .toast { position: fixed; bottom: 30px; right: 30px; background-color: #6923b9; color: white; padding: 14px 24px; border-radius: 8px; font-weight: 600; box-shadow: 0 4px 15px rgba(0,0,0,0.15); opacity: 0; transform: translateY(20px); transition: all 0.3s ease; z-index: 9999; pointer-events: none; }
+        .toast.show { opacity: 1; transform: translateY(0); }
+    </style>
+</head>
+<body>
+
+    <div class="ribbon">
+        <div class="ribbon-brand">
+            <svg viewBox="0 0 24 24"><path d="M3 3h18v18H3V3zm16 16V5H5v14h14zM7 7h10v2H7V7zm0 4h10v2H7v-2zm0 4h7v2H7v-2z"/></svg>
+            RAIL TRACKER
+            <div class="tab-group">
+                <button class="tab-btn active" id="tabActive">Active Tasks</button>
+                <button class="tab-btn tab-success" id="tabCompleted">Completed</button>
+                <button class="tab-btn tab-danger" id="tabOverdue">Overdue Logs</button>
+            </div>
+        </div>
+        <div class="ribbon-tools">
+            <button class="btn" id="addRowBtn">+ Insert Row Below</button>
+        </div>
+    </div>
+
+    <div class="formula-bar">
+        <div class="formula-box">
+            <label> Meeting / Project Name:</label>
+            <input type="text" id="projectTitle" placeholder="Enter details here...">
+        </div>
+        <div class="formula-box date-box">
+            <label>Date:</label>
+            <input type="date" id="globalDate" readonly>
+        </div>
+    </div>
+
+    <div class="sheet-wrapper">
+        <table id="spreadsheet">
+            <colgroup>
+                <col class="c-row-num">
+                <col class="c-category"> 
+                <col class="c-points"><col class="c-plan"><col class="c-resp"><col class="c-support">
+                <col class="c-assigned"><col class="c-due-history"><col class="c-ageing"><col class="c-prio">
+                <col class="c-stat"><col class="c-comp"><col class="c-notes"><col class="c-del">
+            </colgroup>
+            <thead>
+                <tr>
+                    <th>S.no</th><th>Category</th><th>Points Discussed</th><th>Action Plan</th><th>Responsibility</th><th>Support, if required</th>
+                    <th>Assigned Date</th><th>Due Date(s)</th><th>Ageing Timeline</th><th>Priority</th><th>Status</th>
+                    <th>Completed%</th><th>Notes</th><th>Delete</th>
+                </tr>
+            </thead>
+            <tbody id="sheetBody"></tbody>
+        </table>
+    </div>
+
+    <div id="toastMsg" class="toast">Task Updated ✔️</div>
+
+    <script>
+        const sheetBody = document.getElementById('sheetBody');
+        const addRowBtn = document.getElementById('addRowBtn');
+        const spreadsheet = document.getElementById('spreadsheet');
+        const projectTitleInput = document.getElementById('projectTitle');
+        let currentView = 'active'; 
+
+        const getSystemDate = () => {
+            const today = new Date();
+            const offset = today.getTimezoneOffset() * 60000;
+            return new Date(today.getTime() - offset).toISOString().split('T')[0];
+        };
+
+        const todayDate = getSystemDate();
+        document.getElementById('globalDate').value = todayDate;
+
+        function showToast(msg) {
+            const toast = document.getElementById('toastMsg');
+            toast.innerText = msg;
+            toast.classList.add('show');
+            setTimeout(() => { toast.classList.remove('show'); }, 3000);
+        }
+
+        const tabs = document.querySelectorAll('.tab-btn');
+        function setActiveTab(view) {
+            currentView = view;
+            tabs.forEach(t => t.classList.remove('active'));
+            if (view === 'active') document.getElementById('tabActive').classList.add('active');
+            if (view === 'overdue') document.getElementById('tabOverdue').classList.add('active');
+            if (view === 'completed') document.getElementById('tabCompleted').classList.add('active');
+            filterRows();
+        }
+        
+        tabs.forEach(tab => {
+            tab.addEventListener('click', (e) => {
+                if(e.target.id === 'tabActive') setActiveTab('active');
+                if(e.target.id === 'tabOverdue') setActiveTab('overdue');
+                if(e.target.id === 'tabCompleted') setActiveTab('completed');
+            });
+        });
+
+        function filterRows() {
+            const rows = sheetBody.querySelectorAll('tr');
+            let visibleIndex = 1;
+            
+            rows.forEach(row => {
+                const isFullyComplete = row.dataset.fullyCompleted === "true";
+                const isCurrentlyOverdue = row.dataset.isCurrentlyOverdue === "true";
+                const missedOriginalDue = row.dataset.missedOriginalDue === "true";
+                
+                let showRow = false;
+                
+                if (currentView === 'active') {
+                    if (!isFullyComplete && !isCurrentlyOverdue) showRow = true;
+                }
+                if (currentView === 'overdue') {
+                    if (!isFullyComplete && missedOriginalDue) showRow = true;
+                }
+                if (currentView === 'completed') {
+                    if (isFullyComplete) showRow = true;
+                }
+                
+                if (showRow) {
+                    row.style.display = 'table-row';
+                    row.querySelector('.row-num').innerText = visibleIndex++;
+                    syncRowHeights(row); 
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+        }
+
+        function syncRowHeights(row) {
+            const textareas = row.querySelectorAll('textarea');
+            textareas.forEach(ta => ta.style.height = '32px');
+            let maxH = 32;
+            textareas.forEach(ta => { if (ta.scrollHeight > maxH) maxH = ta.scrollHeight; });
+            textareas.forEach(ta => ta.style.height = maxH + 'px');
+        }
+
+        // --- STACKED HISTORY LOGIC ---
+        function updateDatesAndAgeing(row) {
+            const statusSelect = row.querySelector('.c-val-stat');
+            let status = statusSelect.value;
+            const assignedInput = row.querySelector('.c-val-assigned');
+            const ageingInput = row.querySelector('.c-val-ageing');
+            
+            const listDiv = row.querySelector('.date-history-list');
+            const clearBtn = row.querySelector('.clear-dates-btn');
+
+            let dates = JSON.parse(row.dataset.dateHistory || "[]");
+
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+
+            let isCurrentlyOverdue = false;
+            let missedOriginalDue = false;
+            let daysDifferenceText = "";
+            let deadlineDiff = null;
+
+            if (dates.length > 0) {
+                clearBtn.style.display = 'block'; // Show reset button if there are dates
+                
+                // 1. Check original date (the first date in the array)
+                const originalDateStr = dates[0];
+                const originalDate = new Date(originalDateStr);
+                originalDate.setHours(0,0,0,0);
+                if (today > originalDate && status !== 'Complete') {
+                    missedOriginalDue = true;
+                }
+
+                // 2. Check active deadline (the last date in the array)
+                const activeDateStr = dates[dates.length - 1];
+                const deadlineDate = new Date(activeDateStr);
+                deadlineDate.setHours(0,0,0,0);
+                
+                if (status !== 'Complete') {
+                    deadlineDiff = Math.floor((deadlineDate - today) / (1000 * 60 * 60 * 24));
+                    
+                    if (deadlineDiff < 0) {
+                        isCurrentlyOverdue = true;
+                        daysDifferenceText = `(${Math.abs(deadlineDiff)}d overdue)`;
+                        if (status !== 'Overdue') {
+                            statusSelect.value = 'Overdue';
+                            status = 'Overdue';
+                            statusSelect.parentElement.className = 'cell-center c-overdue';
+                        }
+                    } else if (deadlineDiff === 0) {
+                        daysDifferenceText = `(Due Today)`;
+                        if (status === 'Overdue') {
+                            statusSelect.value = 'In Progress';
+                            status = 'In Progress';
+                            statusSelect.parentElement.className = 'cell-center c-progress';
+                        }
+                    } else {
+                        daysDifferenceText = `(${deadlineDiff}d left)`;
+                        if (status === 'Overdue') {
+                            statusSelect.value = 'In Progress';
+                            status = 'In Progress';
+                            statusSelect.parentElement.className = 'cell-center c-progress';
+                        }
+                    }
+                }
+            } else {
+                clearBtn.style.display = 'none';
+                if (status === 'Overdue') {
+                    statusSelect.value = 'In Progress';
+                    status = 'In Progress';
+                    statusSelect.parentElement.className = 'cell-center c-progress';
+                }
+            }
+
+            row.dataset.isCurrentlyOverdue = isCurrentlyOverdue ? "true" : "false";
+            row.dataset.missedOriginalDue = missedOriginalDue ? "true" : "false";
+
+            // --- RENDER THE STACKED DATES ---
+            listDiv.innerHTML = ''; // Clear existing visual list
+            dates.forEach((d, index) => {
+                const div = document.createElement('div');
+                
+                // Convert YYYY-MM-DD to DD/MM/YYYY exactly like the screenshot
+                const parts = d.split('-');
+                if(parts.length === 3) {
+                    div.innerText = `${parts[2]}/${parts[1]}/${parts[0]}`;
+                } else {
+                    div.innerText = d; 
+                }
+                
+                if (index < dates.length - 1) {
+                    // It's an old date -> Strike it out!
+                    div.style.textDecoration = 'line-through';
+                    div.style.color = '#9CA3AF'; // Muted grey
+                    div.style.fontWeight = 'bold';
+                } else {
+                    // It's the active date at the bottom
+                    div.style.fontWeight = 'bold';
+                    div.style.color = isCurrentlyOverdue ? 'var(--danger)' : 'var(--text-main)';
+                }
+                listDiv.appendChild(div);
+            });
+
+            // 3. Smart Ageing Format
+            let ageingDaysValue = null;
+            if (assignedInput.value && assignedInput.hasAttribute('readonly')) {
+                const assignedDate = new Date(assignedInput.value);
+                assignedDate.setHours(0, 0, 0, 0);
+                ageingDaysValue = Math.floor((today - assignedDate) / (1000 * 60 * 60 * 24));
+                if (ageingDaysValue < 0) ageingDaysValue = 0; 
+            }
+
+            let baseText = ageingDaysValue !== null ? `${ageingDaysValue}d old` : "Unsaved";
+            
+            if (status === 'Complete') {
+                ageingInput.value = ageingDaysValue !== null ? `${ageingDaysValue}d old (Done)` : `Done`;
+                ageingInput.className = 'c-val-ageing locked highlight';
+            } else {
+                ageingInput.value = `${baseText} ${daysDifferenceText}`.trim();
+                
+                if (isCurrentlyOverdue) {
+                    ageingInput.className = 'c-val-ageing locked danger';
+                } else if (deadlineDiff === 0) {
+                    ageingInput.className = 'c-val-ageing locked warning'; 
+                } else if (ageingDaysValue > 14 && !isCurrentlyOverdue) {
+                    ageingInput.className = 'c-val-ageing locked danger'; 
+                } else if (ageingDaysValue === null) {
+                    ageingInput.className = 'c-val-ageing locked';
+                    ageingInput.style.color = "var(--text-muted)";
+                } else {
+                    ageingInput.className = 'c-val-ageing locked highlight';
+                }
+            }
+
+            filterRows();
+        }
+
+        function checkCompletionAndMove(row) {
+            const status = row.querySelector('.c-val-stat').value;
+            const category = row.querySelector('.c-val-category').value.trim(); 
+            const points = row.querySelector('.c-val-points').value.trim();
+            const plan = row.querySelector('.c-val-plan').value.trim();
+            const resp = row.querySelector('.c-val-resp').value.trim();
+            const support = row.querySelector('.c-val-support').value.trim();
+            
+            // Just check if there's at least one date in the history
+            const dates = JSON.parse(row.dataset.dateHistory || "[]");
+            const hasDueDate = dates.length > 0;
+            
+            const notes = row.querySelector('.c-val-notes').value.trim();
+
+            const isAllFilled = category !== "" && points !== "" && plan !== "" && resp !== "" && support !== "" && hasDueDate && notes !== "";
+
+            if (status === 'Complete' && isAllFilled) {
+                if (row.dataset.fullyCompleted !== "true") {
+                    row.dataset.fullyCompleted = "true";
+                    showToast("Task Moved to Completed Section ✔️");
+                    filterRows();
+                }
+            } else {
+                if (row.dataset.fullyCompleted === "true") {
+                    row.dataset.fullyCompleted = "false";
+                    filterRows(); 
+                }
+            }
+        }
+
+        function saveData() {
+            const rows = document.querySelectorAll('#sheetBody tr');
+            const data = [];
+            
+            rows.forEach(tr => {
+                data.push({
+                    category: tr.querySelector('.c-val-category').value,
+                    points: tr.querySelector('.c-val-points').value,
+                    plan: tr.querySelector('.c-val-plan').value,
+                    resp: tr.querySelector('.c-val-resp').value,
+                    support: tr.querySelector('.c-val-support').value,
+                    assigned: tr.querySelector('.c-val-assigned').value,
+                    assignedLocked: tr.querySelector('.c-val-assigned').hasAttribute('readonly'),
+                    dueDates: tr.dataset.dateHistory || "[]", // Saving the history array!
+                    prio: tr.querySelector('.c-val-prio').value,
+                    stat: tr.querySelector('.c-val-stat').value,
+                    comp: tr.querySelector('.c-val-comp').value,
+                    notes: tr.querySelector('.c-val-notes').value
+                });
+            });
+            
+            localStorage.setItem('railTrackerData', JSON.stringify(data));
+            localStorage.setItem('railTrackerTitle', projectTitleInput.value);
+        }
+
+        function loadData() {
+            const savedData = localStorage.getItem('railTrackerData');
+            const savedTitle = localStorage.getItem('railTrackerTitle');
+            
+            if (savedTitle) projectTitleInput.value = savedTitle;
+
+            if (savedData) {
+                const data = JSON.parse(savedData);
+                if (data.length === 0) {
+                    for(let i=0; i<25; i++) createRow(); 
+                } else {
+                    data.forEach(rowData => createRow(rowData));
+                }
+            } else {
+                for(let i=0; i<25; i++) createRow();
+            }
+        }
+
+        projectTitleInput.addEventListener('input', saveData);
+
+        function createRow(rowData = null) {
+            const tr = document.createElement('tr');
+            tr.dataset.fullyCompleted = "false";
+            tr.dataset.isCurrentlyOverdue = "false";
+            tr.dataset.missedOriginalDue = "false";
+            tr.dataset.dateHistory = "[]";
+
+            tr.innerHTML = `
+                <td class="row-num"></td>
+                <td><textarea class="c-val-category" rows="1"></textarea></td>
+                <td><textarea class="c-val-points" rows="1"></textarea></td>
+                <td><textarea class="c-val-plan" rows="1"></textarea></td>
+                <td><textarea class="c-val-resp" rows="1"></textarea></td>
+                <td><textarea class="c-val-support" rows="1"></textarea></td>
+                
+                <td class="cell-center">
+                    <div class="date-save-wrapper">
+                        <input type="date" class="c-val-assigned">
+                        <button class="save-date-btn" title="Save Assigned Date">✔</button>
+                    </div>
+                </td>
+                
+                <td class="cell-center" style="padding: 4px;">
+                    <div class="date-history-list" style="margin-bottom: 4px; font-size: 0.85rem; display: flex; flex-direction: column; gap: 2px;"></div>
+                    <input type="date" class="c-val-due-adder" title="Select to add a new deadline" style="height: 28px; min-height: 28px; padding: 0 4px; border: 1px solid var(--grid-line);">
+                    <button class="clear-dates-btn" style="background:none; border:none; color: var(--danger); font-size: 0.75rem; cursor: pointer; text-decoration: underline; margin-top: 6px; padding: 0; display: none; width: 100%;">Clear History</button>
+                </td>
+
+                <td class="cell-center"><input type="text" class="c-val-ageing locked" readonly tabindex="-1" placeholder="..."></td>
+                <td class="cell-center p-medium">
+                    <select class="c-val-prio">
+                        <option value="Low">Low</option><option value="Medium">Medium</option><option value="High">High</option>
+                    </select>
+                </td>
+                <td class="cell-center c-not-started">
+                    <select class="c-val-stat">
+                        <option value="Not Started">Not Started</option><option value="In Progress">In Progress</option>
+                        <option value="Complete">Complete</option><option value="On Hold">On Hold</option><option value="Overdue">Overdue</option>
+                    </select>
+                </td>
+                <td class="cell-center"><input type="number" class="c-val-comp" min="0" max="100" value="0"></td>
+                <td><textarea class="c-val-notes" rows="1"></textarea></td>
+                <td class="cell-center"><button class="del-btn" tabindex="-1" title="Delete Row">✕</button></td>
+            `;
+
+            const assignedInput = tr.querySelector('.c-val-assigned');
+            const saveDateBtn = tr.querySelector('.save-date-btn');
+            const dueAdder = tr.querySelector('.c-val-due-adder');
+            const clearDatesBtn = tr.querySelector('.clear-dates-btn');
+
+            // Assigned Date Lock Logic
+            saveDateBtn.addEventListener('click', () => {
+                if (assignedInput.value) {
+                    assignedInput.setAttribute('readonly', true);
+                    assignedInput.classList.add('locked');
+                    saveDateBtn.style.display = 'none';
+                    updateDatesAndAgeing(tr);
+                    saveData(); 
+                }
+            });
+
+            // ADDING A NEW DATE TO THE STACK
+            dueAdder.addEventListener('change', (e) => {
+                if (e.target.value) {
+                    let dates = JSON.parse(tr.dataset.dateHistory || "[]");
+                    dates.push(e.target.value); // Add new date to array
+                    tr.dataset.dateHistory = JSON.stringify(dates); // Save to HTML
+                    e.target.value = ''; // Reset the calendar picker immediately
+                    
+                    updateDatesAndAgeing(tr);
+                    saveData();
+                }
+            });
+
+            // CLEARING THE HISTORY
+            clearDatesBtn.addEventListener('click', () => {
+                tr.dataset.dateHistory = "[]";
+                updateDatesAndAgeing(tr);
+                saveData();
+            });
+
+            tr.addEventListener('input', function(e) {
+                if(e.target.tagName.toLowerCase() === 'textarea') syncRowHeights(tr);
+                saveData(); 
+            });
+
+            tr.addEventListener('change', function() {
+                checkCompletionAndMove(tr);
+                saveData(); 
+            });
+
+            const prioField = tr.querySelector('.c-val-prio');
+            const prioTd = prioField.parentElement;
+            prioField.addEventListener('change', function() {
+                prioTd.className = 'cell-center'; 
+                const pMap = { "High": "p-high", "Medium": "p-medium", "Low": "p-low" };
+                prioTd.classList.add(pMap[this.value]);
+            });
+
+            const statusField = tr.querySelector('.c-val-stat');
+            const statusTd = statusField.parentElement;
+            const compField = tr.querySelector('.c-val-comp');
+
+            statusField.addEventListener('change', function() {
+                statusTd.className = 'cell-center'; 
+                const map = { "Not Started": "c-not-started", "In Progress": "c-progress", "Complete": "c-complete", "On Hold": "c-hold", "Overdue": "c-overdue" };
+                statusTd.classList.add(map[this.value]);
+                if (this.value === 'Complete') compField.value = 100;
+                
+                updateDatesAndAgeing(tr);
+                checkCompletionAndMove(tr); 
+            });
+
+            tr.querySelector('.del-btn').addEventListener('click', () => { 
+                tr.remove(); 
+                filterRows(); 
+                saveData(); 
+            });
+            
+            // Re-populate Data (Handles smooth transition from your old code to new array code!)
+            if (rowData) {
+                tr.querySelector('.c-val-category').value = rowData.category || "";
+                tr.querySelector('.c-val-points').value = rowData.points || "";
+                tr.querySelector('.c-val-plan').value = rowData.plan || "";
+                tr.querySelector('.c-val-resp').value = rowData.resp || "";
+                tr.querySelector('.c-val-support').value = rowData.support || "";
+                tr.querySelector('.c-val-assigned').value = rowData.assigned || "";
+                
+                // Backwards compatibility trick for old data that hadn't been upgraded to arrays yet
+                let initialDates = [];
+                if (rowData.dueDates) {
+                    initialDates = JSON.parse(rowData.dueDates);
+                } else if (rowData.due) {
+                    initialDates.push(rowData.due);
+                    if (rowData.revised) initialDates.push(rowData.revised);
+                }
+                tr.dataset.dateHistory = JSON.stringify(initialDates);
+                
+                if(rowData.prio) tr.querySelector('.c-val-prio').value = rowData.prio;
+                else tr.querySelector('.c-val-prio').value = "Medium";
+                
+                if(rowData.stat) tr.querySelector('.c-val-stat').value = rowData.stat;
+                else tr.querySelector('.c-val-stat').value = "Not Started";
+
+                tr.querySelector('.c-val-comp').value = rowData.comp || "0";
+                tr.querySelector('.c-val-notes').value = rowData.notes || "";
+
+                if (rowData.assignedLocked) {
+                    assignedInput.setAttribute('readonly', true);
+                    assignedInput.classList.add('locked');
+                    saveDateBtn.style.display = 'none';
+                }
+
+                prioField.dispatchEvent(new Event('change'));
+                statusField.dispatchEvent(new Event('change'));
+                updateDatesAndAgeing(tr);
+            } else {
+                prioField.dispatchEvent(new Event('change'));
+            }
+
+            sheetBody.appendChild(tr);
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            loadData();
+            setActiveTab('active');
+        });
+
+        addRowBtn.addEventListener('click', () => {
+            if(currentView !== 'active') document.getElementById('tabActive').click();
+            createRow();
+            filterRows(); 
+            saveData();  
+            const wrapper = document.querySelector('.sheet-wrapper');
+            wrapper.scrollTop = wrapper.scrollHeight;
+        });
+
+        window.addEventListener('beforeunload', () => {
+            if (document.activeElement) document.activeElement.blur(); 
+            saveData();
+        });
+
+    </script>
+</body>
+</html>
